@@ -4,14 +4,14 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import warnings
+import warnings, os, pathlib
 warnings.filterwarnings("ignore")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
 # ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Painel de Pacientes · Telemedicina",
+    page_title="Painel de Pacientes · dr.edgar",
     page_icon="🩺",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -20,12 +20,12 @@ st.set_page_config(
 # ──────────────────────────────────────────────────────────────────────────────
 # PALETTE
 # ──────────────────────────────────────────────────────────────────────────────
-BG      = "#FAF7F2"
-CARD    = "#FFFFFF"
-BORDER  = "#EDE9E1"
-TDARK   = "#2E2B28"
-TMID    = "#6B6560"
-ACCENT  = "#B8835A"
+BG     = "#FAF7F2"
+CARD   = "#FFFFFF"
+BORDER = "#EDE9E1"
+TDARK  = "#2E2B28"
+TMID   = "#6B6560"
+ACCENT = "#B8835A"
 
 P = [
     "#F2A7BB",  # rosa
@@ -43,6 +43,12 @@ P = [
 ]
 
 # ──────────────────────────────────────────────────────────────────────────────
+# LOGO (base64 embedded)
+# ──────────────────────────────────────────────────────────────────────────────
+_logo_path = pathlib.Path(__file__).parent / "logo_b64_clean.txt"
+LOGO_B64 = _logo_path.read_text().strip() if _logo_path.exists() else ""
+
+# ──────────────────────────────────────────────────────────────────────────────
 # CSS
 # ──────────────────────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -50,17 +56,13 @@ st.markdown(f"""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 html, body, [data-testid="stAppViewContainer"] {{
-    background: {BG};
-    font-family: 'Inter', sans-serif;
-    color: {TDARK};
+    background: {BG}; font-family: 'Inter', sans-serif; color: {TDARK};
 }}
 [data-testid="stSidebar"] {{
-    background: #F0EBE3;
-    border-right: 1px solid {BORDER};
+    background: #F0EBE3; border-right: 1px solid {BORDER};
 }}
 .stTabs [data-baseweb="tab-list"] {{
-    gap: 3px; background: {BORDER};
-    padding: 4px; border-radius: 10px;
+    gap: 3px; background: {BORDER}; padding: 4px; border-radius: 10px;
 }}
 .stTabs [data-baseweb="tab"] {{
     background: transparent; border: none; border-radius: 8px;
@@ -74,133 +76,78 @@ html, body, [data-testid="stAppViewContainer"] {{
     background: {CARD}; border: 1px solid {BORDER}; border-radius: 14px;
     padding: 18px 20px; text-align: center;
 }}
-.kpi-value  {{ font-size: 2.1rem; font-weight: 700; color: {TDARK}; line-height: 1.1; }}
-.kpi-label  {{ font-size: 11px; font-weight: 600; color: {TMID}; margin-top: 6px;
-               letter-spacing: .05em; text-transform: uppercase; }}
-.kpi-sub    {{ font-size: 11px; color: {ACCENT}; margin-top: 3px; }}
-.sec-title  {{ font-size: 15px; font-weight: 600; color: {TDARK};
-               border-left: 3px solid {ACCENT}; padding-left: 10px; margin-bottom: 3px; }}
-.sec-sub    {{ font-size: 12px; color: {TMID}; margin-bottom: 14px; padding-left: 13px; }}
+.kpi-value {{ font-size: 2.1rem; font-weight: 700; color: {TDARK}; line-height: 1.1; }}
+.kpi-label {{ font-size: 11px; font-weight: 600; color: {TMID}; margin-top: 6px;
+              letter-spacing: .05em; text-transform: uppercase; }}
+.kpi-sub   {{ font-size: 11px; color: {ACCENT}; margin-top: 3px; }}
+.sec-title {{ font-size: 15px; font-weight: 600; color: {TDARK};
+              border-left: 3px solid {ACCENT}; padding-left: 10px; margin-bottom: 3px; }}
+.sec-sub   {{ font-size: 12px; color: {TMID}; margin-bottom: 14px; padding-left: 13px; }}
 .block-container {{ padding-top: 1.8rem; }}
 </style>
 """, unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CHART DEFAULTS
+# CHART HELPERS
 # ──────────────────────────────────────────────────────────────────────────────
-LAYOUT = dict(
+_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
     font=dict(family="Inter", color=TDARK),
-    margin=dict(t=42, b=14, l=14, r=14),
+    margin=dict(t=44, b=14, l=14, r=14),
     legend=dict(font=dict(size=11, color=TDARK)),
     title_font=dict(size=13, color=TDARK),
 )
-AXIS = dict(showgrid=False, color=TDARK, tickfont=dict(size=11, color=TDARK))
-AXIS_GRID = dict(showgrid=True, gridcolor=BORDER, color=TDARK, tickfont=dict(size=11, color=TDARK))
+_AX      = dict(showgrid=False, color=TDARK, tickfont=dict(size=11, color=TDARK))
+_AX_GRID = dict(showgrid=True, gridcolor=BORDER, color=TDARK, tickfont=dict(size=11, color=TDARK))
 
-def apply_layout(fig, title="", height=280, grid_y=False):
-    fig.update_layout(**LAYOUT, height=height,
+def _lay(fig, title="", h=280, grid_y=False):
+    fig.update_layout(**_LAYOUT, height=h,
                       title=dict(text=title, font=dict(size=13, color=TDARK), x=0, xref="paper"))
-    fig.update_xaxes(**AXIS)
-    if grid_y:
-        fig.update_yaxes(**AXIS_GRID)
-    else:
-        fig.update_yaxes(**AXIS)
+    fig.update_xaxes(**_AX)
+    fig.update_yaxes(**(_AX_GRID if grid_y else _AX))
     return fig
 
-# ──────────────────────────────────────────────────────────────────────────────
-# DATA
-# ──────────────────────────────────────────────────────────────────────────────
-@st.cache_data
-def load():
-    df  = pd.read_csv("dados_sinteticos.csv")
-    fup = pd.read_csv("acompanhamento.csv")
-
-    df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce", utc=True)
-    df["mes"] = df["created_at"].dt.to_period("M").astype(str)
-
-    def bmi_cat(b):
-        if pd.isna(b): return None
-        if b < 18.5:  return "Abaixo do peso"
-        if b < 25:    return "Peso normal"
-        if b < 30:    return "Sobrepeso"
-        if b < 35:    return "Obesidade I"
-        return "Obesidade II/III"
-
-    def age_grp(a):
-        if pd.isna(a): return None
-        if a < 30:  return "< 30"
-        if a < 40:  return "30–39"
-        if a < 50:  return "40–49"
-        if a < 60:  return "50–59"
-        return "60+"
-
-    df["bmi_cat"]   = df["bmi"].apply(bmi_cat)
-    df["age_group"] = df["age"].apply(age_grp)
-
-    fup["date"] = pd.to_datetime(fup["date"], errors="coerce")
-    fup["mes"]  = fup["date"].dt.to_period("M").astype(str)
-
-    return df, fup
-
-df, fup = load()
-
-# ──────────────────────────────────────────────────────────────────────────────
-# HELPERS
-# ──────────────────────────────────────────────────────────────────────────────
-def pct(col):
-    return df[col].dropna().value_counts(normalize=True).mul(100).round(1)
-
-def donut(col, title, colors=None, h=280):
-    s = pct(col)
-    if s.empty:
-        return go.Figure()
-    c = colors or P
+def donut(s, title, colors=None, h=280):
+    if s.empty: return go.Figure()
+    c = (colors or P)[:len(s)]
     fig = go.Figure(go.Pie(
         labels=s.index, values=s.values, hole=0.55,
-        textinfo="percent", textfont=dict(size=12, color="#000000"),
-        marker=dict(colors=c[:len(s)], line=dict(color="white", width=2)),
+        textinfo="percent", textfont=dict(size=12, color="#000"),
+        marker=dict(colors=c, line=dict(color="white", width=2)),
         hovertemplate="%{label}: %{value:.1f}%<extra></extra>",
     ))
-    apply_layout(fig, title, h)
-    fig.update_layout(showlegend=True)
-    return fig
+    return _lay(fig, title, h)
 
-def hbar(col, title, color=None, h=None):
-    s = pct(col).sort_values()
+def hbar(s, title, color=None, h=None):
     if s.empty: return go.Figure()
-    c = color or P[1]
+    s = s.sort_values()
     h = h or max(160, len(s) * 52)
     fig = go.Figure(go.Bar(
         x=s.values, y=s.index, orientation="h",
-        marker_color=c,
+        marker_color=color or P[1],
         text=[f"<b>{v:.0f}%</b>" for v in s.values],
-        textposition="outside",
-        textfont=dict(size=12, color="#000000"),
+        textposition="outside", textfont=dict(size=12, color="#000"),
         hovertemplate="%{y}: %{x:.1f}%<extra></extra>",
     ))
-    apply_layout(fig, title, h)
+    _lay(fig, title, h)
     fig.update_xaxes(showticklabels=False, range=[0, s.max() * 1.3])
     return fig
 
-def vbar(col, title, color=None, h=260):
-    s = pct(col)
+def vbar(s, title, colors=None, h=260):
     if s.empty: return go.Figure()
-    c = color or P[1]
+    c = colors or [P[i % len(P)] for i in range(len(s))]
     fig = go.Figure(go.Bar(
         x=s.index, y=s.values,
-        marker_color=c,
+        marker_color=c if isinstance(c, list) else c,
         text=[f"<b>{v:.0f}%</b>" for v in s.values],
-        textposition="outside",
-        textfont=dict(size=12, color="#000000"),
+        textposition="outside", textfont=dict(size=12, color="#000"),
         hovertemplate="%{x}: %{y:.1f}%<extra></extra>",
     ))
-    apply_layout(fig, title, h, grid_y=False)
+    _lay(fig, title, h)
     fig.update_yaxes(showticklabels=False, range=[0, s.max() * 1.25])
     return fig
 
-def stacked_bar(data, x_col, y_col, color_col, title, h=300, order=None):
-    """Normalised stacked bar (100%)"""
+def stacked(data, x_col, color_col, title, h=300, order=None):
     ct = data.groupby([x_col, color_col]).size().unstack(fill_value=0)
     ct_pct = ct.div(ct.sum(axis=1), axis=0).mul(100).round(1)
     if order:
@@ -211,37 +158,81 @@ def stacked_bar(data, x_col, y_col, color_col, title, h=300, order=None):
         fig.add_trace(go.Bar(
             name=col, x=ct_pct.index, y=vals,
             marker_color=P[i % len(P)],
-            text=[f"<b>{v:.0f}%</b>" if v >= 8 else "" for v in vals],
-            textposition="inside",
-            textfont=dict(size=11, color="#000000"),
-            hovertemplate=f"{col}: %{{y:.1f}}<extra></extra>",
+            text=[f"<b>{v:.0f}%</b>" if v >= 7 else "" for v in vals],
+            textposition="inside", textfont=dict(size=11, color="#000"),
+            hovertemplate=f"{col}: %{{y:.1f}}%<extra></extra>",
         ))
-    apply_layout(fig, title, h)
+    _lay(fig, title, h)
     fig.update_layout(barmode="stack",
                       yaxis=dict(showticklabels=False, range=[0, 110], showgrid=False))
     return fig
 
 # ──────────────────────────────────────────────────────────────────────────────
+# DATA
+# ──────────────────────────────────────────────────────────────────────────────
+@st.cache_data
+def load():
+    df = pd.read_excel("pacientes_edgar_200.xlsx")
+
+    def bmi_cat(b):
+        if b < 18.5: return "Abaixo do peso"
+        if b < 25:   return "Peso normal"
+        if b < 30:   return "Sobrepeso"
+        if b < 35:   return "Obesidade I"
+        return "Obesidade II/III"
+
+    def age_grp(a):
+        if a < 30: return "< 30"
+        if a < 40: return "30–39"
+        if a < 50: return "40–49"
+        if a < 60: return "50–59"
+        if a < 70: return "60–69"
+        return "70+"
+
+    def risco_grp(r):
+        if r < 15:  return "Baixo (<15%)"
+        if r < 30:  return "Moderado (15–30%)"
+        if r < 50:  return "Alto (30–50%)"
+        return "Muito Alto (≥50%)"
+
+    df["bmi_cat"]    = df["IMC"].apply(bmi_cat)
+    df["age_group"]  = df["Idade"].apply(age_grp)
+    df["risco_grp"]  = df["Risco de Internação 10 anos (%)"].apply(risco_grp)
+    df["internado"]  = df["Última Internação"].ne("Nenhuma").map(
+        {True: "Já internado", False: "Sem internação"}
+    )
+    df["Sexo_full"]  = df["Sexo"].map({"M": "Masculino", "F": "Feminino"})
+
+    return df
+
+df = load()
+
+COMP_COLS = [c for c in df.columns if "Comprometimento" in c]
+COMP_LABELS = [c.replace("Comprometimento ", "") for c in COMP_COLS]
+
+def pct(col):
+    return df[col].value_counts(normalize=True).mul(100).round(1)
+
+def split_expand(col, sep="; "):
+    return df[col].dropna().str.split(sep).explode().str.strip()
+
+# ──────────────────────────────────────────────────────────────────────────────
 # SIDEBAR
 # ──────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    LOGO_B64 = "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IIIIIIIIMIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcEIIIJEIIIIIIIIIIIIIIIIIIIIIIIVIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIIIIIEIIIIIIIIIIIIIIIIIIIIIIFkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQIIIEIIIIIIIIIIIIIIIIIIIIISEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAIIEIIIIIIIIIIIIIIIIIIII9EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACIkEIIIIIIIIIIIIIIIIIIJmMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADOgIIIIIIIIIIIIIIIIIcIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIogIIIIIIIIIIIwnIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKIAwUEEwEZBKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAgADAAAAEAwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwCiASBTgwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww0wIwwwwwwQBQwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwxwn6Qwwwwwwwww4yAwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwv/ADykMMMMMMMMMMPMMMMMMMMMccMMMMMMMMMMMMMMMMMMPEMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMSzzzykMMMMMMMMMMMNEgMMMMMNUEMMMMMMMMMMMMMMMMMMMAMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNfzzzykMMMMMMMMMMMMNAMMMMMNUEMMMMMMMMMMMMMMMMMMMAMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNXzzzzykMMMMMMMMMMMMMOIMMYAAcEMqINekMMNLaQkMMcwgsAMMlyh8oMUBy4sOorqMMMMMMMMMMMMMrzzzzzykMMMMMMMMMMMMMNYMeOhCAEOncUOEMNoENNQMPIMOIMMNoMOSIMMMNEIOvAMMMMMMMMMMMMMNTzzzzzykMMMMMMMMMMMMMNOBMcMNEEOloMMMMOI889oMfgMMOENAMMMWoMM4IL4OoMMMMMMMMMMMMMMPzzzzzzykMMMMMMMMMMMMMMMpEEMNWkOn8MMMMPPDDCCMMIMMOoOAMMNeoPDHPNYOgMMMMMMMMMMMMMN3zzzzzzykMMMMMMMMMMMMMMOJIUkNWkOn8MMUsOQMMMMNMEMMOoMAkMNeoOIMMN4OgMMMMMMMMMMMMMN3zzzzzzykMMMMMMMMMMMMMMOMMtkIAEOn8MODcMM000EMMaAkGgMOEg9+IPAU8/4OgMMMMMMMMMMMMMN7zzzzzzykMMMMMMMMMMMMMMOoMOPLLIMEMMMSMMMNPIEMMNGIJEMMNMEIIMMEIIMMEMMMMMMMMMMMMMNHPPPPPPOAMMMMMMMMMMMMMMMQ888888888888wMMMMMMMMMMMMMMMMMNKEMMMMMMMMMMMMMMMMMMMMMMoAAAAAABYoMMMMMMMMMMMMMJ3zzzzzzzzzzzzkMMMMMMMMMMMMMMMMpSgMMMMMMMMMMMMMMMMMMMMMMMsAAAAAABcAMMMMMMMMMMMMP7zzzzzzzzzzzzzEMMMMMMMMMMMMMMMMEMMMMMMMMMMMMMMMMMMMMMMMMMEAAAAAABdoMMMMMMMMMMMMh3zzzzzzzzzzzzkEMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMoAAAAAABPwUMMMMMMMMMMj3zzzzzzzzzzzzywMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNIAAAAAAAPz2EsMMMMMMcTzzzzzzzzzzzzzzysMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNcIAAAAAAPzzw4AoMIpx7zzzzzzzzzzzzzzzwIMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMOAAAAAAAfzzzzzyx3zzzzzzzzzzzzzzzzzwMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNMAAAAABfzzzzzzzzzzzzzzzzzzzzzzzzy0MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMOAAAAABfzzzzzzzzzzzzzzzzzzzzzzzzsIMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMUAAAABDzzzzzzzzzzzzzzzzzzzzzzzsAMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMOIgAAADzzzzzzzzzzzzzzzzzzzzzzqgMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMAAADzzzzzzzzzzzzzzzzzzzzzqkMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMgATzzzzzzzzzzzzzzzzzzzzjIMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMOIhTzzzzzzzzzzzzzzzzzzn0AMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNFjzzzzzzzzzzzzzzzzzYAMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM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"
-    st.markdown(
-        f'<img src="data:image/jpeg;base64,{LOGO_B64}"'
-        ' style="width:100%;border-radius:10px;margin-bottom:8px;">',
-        unsafe_allow_html=True,
-    )
+    if LOGO_B64:
+        st.markdown(
+            f'<img src="data:image/jpeg;base64,{LOGO_B64}" '
+            f'style="width:100%;border-radius:10px;margin-bottom:8px;">',
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
 
-    total       = len(df)
-    com_dados   = df["sex_at_birth"].notna().sum()
-    key_fields  = ["sex_at_birth","race_ethnicity","age","bmi","diagnosis",
-                   "smoking_status","physical_activity_modal","sleep_quality",
-                   "general_wellbeing","anxiety_depression_status"]
-    df["_comp"] = df[key_fields].notna().mean(axis=1) * 100
-    perc_60     = (df["_comp"] >= 60).mean() * 100
-    idade_media = df["age"].dropna().mean()
+    pct_f  = (df["Sexo"] == "F").mean() * 100
+    pct_m  = (df["Sexo"] == "M").mean() * 100
+    pct_cr = (df["Doenças Crônicas"] != "Nenhuma doença crônica").mean() * 100
+    risco_m = df["Risco de Internação 10 anos (%)"].mean()
 
     st.markdown(f"""
     <div style="font-size:11px;font-weight:600;color:{TMID};letter-spacing:.05em;
@@ -249,11 +240,13 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     for label, val in [
-        ("Total de pacientes", str(total)),
-        ("Com dados informados", str(com_dados)),
-        ("Perfil ≥ 60% completo", f"{perc_60:.0f}%"),
-        ("Idade média", f"{idade_media:.0f} anos"),
-        ("Consultas de seguimento", str(len(fup))),
+        ("Total de pacientes", "200"),
+        ("Feminino / Masculino", f"{pct_f:.0f}% / {pct_m:.0f}%"),
+        ("Com doença crónica", f"{pct_cr:.0f}%"),
+        ("Idade média", f"{df['Idade'].mean():.0f} anos"),
+        ("IMC médio", f"{df['IMC'].mean():.1f}"),
+        ("Risco médio de internação", f"{risco_m:.0f}%"),
+        ("DALY médio", f"{df['DALY Estimado'].mean():.1f}"),
     ]:
         st.markdown(f"""
         <div style="display:flex;justify-content:space-between;padding:7px 0;
@@ -268,11 +261,9 @@ with st.sidebar:
 # ──────────────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div style="margin-bottom:20px;">
-  <h1 style="font-size:22px;font-weight:700;margin:0;color:{TDARK};">
-    Painel de Pacientes
-  </h1>
+  <h1 style="font-size:22px;font-weight:700;margin:0;color:{TDARK};">Painel de Pacientes</h1>
   <p style="font-size:13px;color:{TMID};margin:3px 0 0;">
-    Telemedicina · Acompanhamento e perfil via WhatsApp
+    Telemedicina · dr.edgar · 200 pacientes
   </p>
 </div>
 """, unsafe_allow_html=True)
@@ -280,270 +271,93 @@ st.markdown(f"""
 # ──────────────────────────────────────────────────────────────────────────────
 # KPI STRIP
 # ──────────────────────────────────────────────────────────────────────────────
-with_bmi   = df["bmi"].notna()
-pct_sobr   = (df.loc[with_bmi, "bmi_cat"].isin(["Sobrepeso","Obesidade I","Obesidade II/III"])).mean()*100
-pct_card   = fup["risk_assessment"].isin(["Alto","Muito Alto"]).mean()*100
-pct_htna   = df["diagnosis"].dropna().str.contains("Hipertensão").mean()*100
-pct_atv    = df["physical_activity_modal"].dropna().ne("Nenhuma").mean()*100
-
-cols_kpi = st.columns(5)
+k1, k2, k3, k4, k5, k6 = st.columns(6)
 kpis = [
-    (str(total),              "Pacientes",        "registros"),
-    (f"{df['sex_at_birth'].eq('Masculino').mean()*100:.0f}% / {df['sex_at_birth'].eq('Feminino').mean()*100:.0f}%",
-                              "M / F",            "distribuição de sexo"),
-    (f"{pct_sobr:.0f}%",     "Excesso de Peso",  "dos pacientes c/ IMC"),
-    (f"{pct_htna:.0f}%",     "Hipertensão",      "dos diagnosticados"),
-    (f"{pct_atv:.0f}%",      "Ativos",           "praticam exercício"),
+    ("200",                                              "Pacientes",           "na base"),
+    (f"{pct_f:.0f}% / {pct_m:.0f}%",                   "F / M",               "distribuição"),
+    (f"{df['Idade'].mean():.0f}",                        "Idade média",         "anos"),
+    (f"{(df['IMC'] >= 25).mean()*100:.0f}%",            "Excesso de peso",     "IMC ≥ 25"),
+    (f"{risco_m:.0f}%",                                  "Risco de internação", "média 10 anos"),
+    (f"{df['DALY Estimado'].mean():.1f}",                "DALY médio",          "anos de vida ajustados"),
 ]
-for c, (val, label, sub) in zip(cols_kpi, kpis):
-    with c:
+for col, (val, label, sub) in zip([k1,k2,k3,k4,k5,k6], kpis):
+    with col:
         st.markdown(f"""
         <div class="kpi-card">
           <div class="kpi-value">{val}</div>
           <div class="kpi-label">{label}</div>
           <div class="kpi-sub">{sub}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
 
 st.markdown("<div style='margin-top:22px'></div>", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TABS
 # ──────────────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "👤 Demográfico",
     "🌿 Estilo de Vida",
-    "🧠 Saúde Mental",
     "🏥 Histórico Médico",
+    "🫀 Comprometimentos",
     "🔗 Análises Cruzadas",
-    "📈 Tendências",
+    "📈 Indicadores Clínicos",
+    "🔬 Explorador",
 ])
 
-# ══════════════════════════════════════════════════════════
-# TAB 1 ─ DEMOGRÁFICO
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 1 — DEMOGRÁFICO
+# ══════════════════════════════════════════════════════════════════════════════
 with tab1:
     st.markdown('<div class="sec-title">Perfil Demográfico</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Distribuições dos pacientes com dados informados</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Caracterização da base de 200 pacientes</div>', unsafe_allow_html=True)
 
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
+
     with c1:
-        st.plotly_chart(donut("sex_at_birth", "Sexo ao Nascimento",
-                              [P[1], P[0], P[2]]), width="stretch", key="pc_1")
-    with c2:
-        st.plotly_chart(donut("gender_identity", "Identidade de Gênero",
-                              [P[1], P[0], P[4]]), width="stretch", key="pc_2")
+        s = pct("Sexo_full")
+        st.plotly_chart(donut(s, "Sexo", [P[1], P[0]]), key="d_sexo", use_container_width=True)
 
-    c3, c4 = st.columns(2)
-    with c3:
-        st.plotly_chart(hbar("race_ethnicity", "Raça / Etnia", P[2]), width="stretch", key="pc_3")
-    with c4:
-        ages_v = df["age"].dropna()
-        ages_v = ages_v[ages_v < 110]
+    with c2:
+        # Age distribution
         fig_age = go.Figure(go.Histogram(
-            x=ages_v, nbinsx=9,
+            x=df["Idade"], nbinsx=10,
             marker_color=P[3], marker_line_color="white", marker_line_width=1.5,
-            hovertemplate="Faixa: %{x}<br>Qtd: %{y}<extra></extra>",
+            hovertemplate="Idade: %{x}<br>Qtd: %{y}<extra></extra>",
         ))
-        apply_layout(fig_age, "Distribuição de Idades", 280, grid_y=False)
+        _lay(fig_age, "Distribuição de Idades", 280)
         fig_age.update_xaxes(title="Idade")
         fig_age.update_yaxes(showticklabels=False)
-        st.plotly_chart(fig_age, width="stretch", key="pc_4")
+        st.plotly_chart(fig_age, key="d_age", use_container_width=True)
 
-    c5, c6 = st.columns(2)
-    with c5:
-        st.plotly_chart(hbar("current_location", "Localização Atual", P[1]), width="stretch", key="pc_5")
-    with c6:
-        prof = pct("profession").head(9).sort_values()
-        fig_prof = go.Figure(go.Bar(
-            x=prof.values, y=prof.index, orientation="h",
-            marker_color=P[4],
-            text=[f"<b>{v:.0f}%</b>" for v in prof.values],
-            textposition="outside",
-            textfont=dict(size=11, color="#000000"),
-        ))
-        apply_layout(fig_prof, "Profissões (Top 9)", max(220, len(prof)*48))
-        fig_prof.update_xaxes(showticklabels=False, range=[0, prof.max()*1.3])
-        st.plotly_chart(fig_prof, width="stretch", key="pc_6")
-
-# ══════════════════════════════════════════════════════════
-# TAB 2 ─ ESTILO DE VIDA
-# ══════════════════════════════════════════════════════════
-with tab2:
-    st.markdown('<div class="sec-title">Estilo de Vida</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Hábitos e rotina dos pacientes</div>', unsafe_allow_html=True)
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.plotly_chart(donut("smoking_status", "Tabagismo", [P[2], P[3], P[0]]),
-                        width="stretch", key="pc_7")
-    with c2:
-        st.plotly_chart(donut("alcohol_frequency", "Consumo de Álcool",
-                              [P[2], P[3], P[1], P[4], P[0]]),
-                        width="stretch", key="pc_8")
     with c3:
-        st.plotly_chart(donut("sleep_quality", "Qualidade do Sono",
-                              [P[2], P[5], P[0]]),
-                        width="stretch", key="pc_9")
+        age_pct = df["age_group"].value_counts(normalize=True).mul(100).round(1)
+        age_order = ["< 30","30–39","40–49","50–59","60–69","70+"]
+        age_pct = age_pct.reindex([a for a in age_order if a in age_pct.index])
+        st.plotly_chart(vbar(age_pct, "Faixa Etária (%)", colors=P), key="d_agegrp", use_container_width=True)
 
     c4, c5 = st.columns(2)
+
     with c4:
-        st.plotly_chart(hbar("physical_activity_modal", "Modalidade de Atividade Física", P[5]),
-                        width="stretch", key="pc_10")
-    with c5:
-        st.plotly_chart(hbar("physical_activity_freq", "Frequência de Atividade Física", P[1]),
-                        width="stretch", key="pc_11")
-
-    c6, c7 = st.columns(2)
-    with c6:
-        st.plotly_chart(vbar("work_stress_level", "Nível de Estresse no Trabalho", P[0]),
-                        width="stretch", key="pc_12")
-    with c7:
-        # Sleep hours
-        slh = df["sleep_hours"].dropna()
-        slh = slh[slh > 0]
-        avg_slh = slh.mean()
-        bins = pd.cut(slh, bins=[3, 5, 6, 7, 8, 9, 11],
-                      labels=["≤5h","6h","7h","8h","9h","10h+"])
-        slh_pct = bins.value_counts(normalize=True).sort_index().mul(100)
-        fig_slh = go.Figure(go.Bar(
-            x=slh_pct.index.astype(str), y=slh_pct.values,
-            marker_color=P[6],
-            text=[f"<b>{v:.0f}%</b>" for v in slh_pct.values],
-            textposition="outside",
-            textfont=dict(size=12, color="#000000"),
-        ))
-        apply_layout(fig_slh, f"Horas de Sono por Noite (média {avg_slh:.1f}h)", 260)
-        fig_slh.update_yaxes(showticklabels=False, range=[0, slh_pct.max()*1.25])
-        st.plotly_chart(fig_slh, width="stretch", key="pc_13")
-
-    # Social support full width
-    sup_raw = df["social_support"].dropna()
-    # column may contain Python booleans or the strings "True"/"False"
-    sup_v = sup_raw.map(
-        lambda x: "Com suporte" if x is True or str(x) == "True"
-                  else ("Sem suporte" if x is False or str(x) == "False" else None)
-    ).dropna()
-    sup_pct = sup_v.value_counts(normalize=True).mul(100).round(1)
-    fig_sup = go.Figure(go.Pie(
-        labels=sup_pct.index, values=sup_pct.values, hole=0.55,
-        textinfo="percent", textfont=dict(size=13, color="#000000"),
-        marker=dict(colors=[P[2], P[0]], line=dict(color="white", width=2)),
-    ))
-    apply_layout(fig_sup, "Suporte Social", 240)
-    st.plotly_chart(fig_sup, width="stretch", key="pc_14")
-
-# ══════════════════════════════════════════════════════════
-# TAB 3 ─ SAÚDE MENTAL
-# ══════════════════════════════════════════════════════════
-with tab3:
-    st.markdown('<div class="sec-title">Saúde Mental</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Indicadores de bem-estar e saúde emocional</div>', unsafe_allow_html=True)
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.plotly_chart(donut("general_wellbeing", "Bem-Estar Geral",
-                              [P[2], P[1], P[5], P[3], P[0]]),
-                        width="stretch", key="pc_15")
-    with c2:
-        st.plotly_chart(donut("anxiety_depression_status", "Ansiedade / Depressão",
-                              [P[2], P[5], P[3], P[0]]),
-                        width="stretch", key="pc_16")
-    with c3:
-        st.plotly_chart(donut("morning_disposition", "Disposição Matinal",
-                              [P[2], P[5], P[0]]),
-                        width="stretch", key="pc_17")
-
-    c4, c5 = st.columns(2)
-    with c4:
-        st.plotly_chart(hbar("caffeine_consumption", "Consumo de Cafeína", P[3]),
-                        width="stretch", key="pc_18")
-    with c5:
-        st.plotly_chart(hbar("cognitive_changes", "Alterações Cognitivas", P[4]),
-                        width="stretch", key="pc_19")
-
-    c6, c7 = st.columns(2)
-    with c6:
-        st.plotly_chart(donut("sleep_medications", "Medicação para Dormir",
-                              [P[2], P[0]]),
-                        width="stretch", key="pc_20")
-    with c7:
-        st.plotly_chart(donut("sleep_quality",
-                              "Qualidade do Sono",
-                              [P[2], P[5], P[0]]),
-                        width="stretch", key="pc_21")
-
-# ══════════════════════════════════════════════════════════
-# TAB 4 ─ HISTÓRICO MÉDICO
-# ══════════════════════════════════════════════════════════
-with tab4:
-    st.markdown('<div class="sec-title">Histórico Médico</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Condições clínicas, antecedentes e métricas de saúde</div>', unsafe_allow_html=True)
-
-    # Expand diagnoses (some patients have multiple)
-    diag_expanded = (df["diagnosis"].dropna()
-                     .str.split(r" \| ", regex=True).explode()
-                     .value_counts(normalize=True).mul(100).round(1)
-                     .sort_values())
-    fig_diag = go.Figure(go.Bar(
-        x=diag_expanded.values, y=diag_expanded.index, orientation="h",
-        marker_color=P[0],
-        text=[f"<b>{v:.0f}%</b>" for v in diag_expanded.values],
-        textposition="outside",
-        textfont=dict(size=12, color="#000000"),
-    ))
-    apply_layout(fig_diag, "Diagnósticos Informados (% dos pacientes com diagnóstico)",
-                 max(200, len(diag_expanded)*54))
-    fig_diag.update_xaxes(showticklabels=False, range=[0, diag_expanded.max()*1.3])
-    st.plotly_chart(fig_diag, width="stretch", key="pc_22")
-
-    c1, c2 = st.columns(2)
-    with c1:
         bmi_order = ["Abaixo do peso","Peso normal","Sobrepeso","Obesidade I","Obesidade II/III"]
-        bmi_pct = df["bmi_cat"].dropna().value_counts(normalize=True).mul(100).round(1)
+        bmi_pct = df["bmi_cat"].value_counts(normalize=True).mul(100).round(1)
         bmi_pct = bmi_pct.reindex([b for b in bmi_order if b in bmi_pct.index])
         fig_bmi = go.Figure(go.Bar(
             x=bmi_pct.index, y=bmi_pct.values,
             marker_color=[P[2], P[5], P[3], P[9], P[0]],
             text=[f"<b>{v:.0f}%</b>" for v in bmi_pct.values],
-            textposition="outside",
-            textfont=dict(size=12, color="#000000"),
+            textposition="outside", textfont=dict(size=12, color="#000"),
         ))
-        apply_layout(fig_bmi, "Categorias de IMC", 280)
-        fig_bmi.update_yaxes(showticklabels=False, range=[0, bmi_pct.max()*1.25])
-        st.plotly_chart(fig_bmi, width="stretch", key="pc_23")
-    with c2:
-        # Risco cardiovascular
-        st.plotly_chart(donut("risk_assessment", "Risco Cardiovascular",
-                              [P[2], P[5], P[3], P[0]]),
-                        width="stretch", key="pc_24")
+        _lay(fig_bmi, "Categorias de IMC", 280)
+        fig_bmi.update_yaxes(showticklabels=False, range=[0, bmi_pct.max() * 1.25])
+        st.plotly_chart(fig_bmi, key="d_bmicat", use_container_width=True)
 
-    c3, c4 = st.columns(2)
-    with c3:
-        # Family history expanded
-        fam_exp = (df["family_history"].dropna()
-                   .str.split(r" \| ", regex=True).explode()
-                   .value_counts(normalize=True).mul(100).round(1)
-                   .sort_values())
-        fig_fam = go.Figure(go.Bar(
-            x=fam_exp.values, y=fam_exp.index, orientation="h",
-            marker_color=P[4],
-            text=[f"<b>{v:.0f}%</b>" for v in fam_exp.values],
-            textposition="outside",
-            textfont=dict(size=12, color="#000000"),
-        ))
-        apply_layout(fig_fam, "Histórico Familiar", max(200, len(fam_exp)*54))
-        fig_fam.update_xaxes(showticklabels=False, range=[0, fam_exp.max()*1.3])
-        st.plotly_chart(fig_fam, width="stretch", key="pc_25")
-    with c4:
-        # BMI vs age scatter
-        scatter_d = df[df["bmi"].notna() & df["age"].notna()].copy()
-        scatter_d["sex_label"] = scatter_d["sex_at_birth"].fillna("Não informado")
+    with c5:
+        # IMC vs Idade scatter
         fig_sc = px.scatter(
-            scatter_d, x="age", y="bmi", color="sex_label",
-            color_discrete_map={"Masculino": P[1], "Feminino": P[0], "Não informado": P[7]},
-            labels={"age":"Idade","bmi":"IMC","sex_label":"Sexo"},
-            title="IMC × Idade por Sexo",
+            df, x="Idade", y="IMC", color="Sexo_full",
+            color_discrete_map={"Masculino": P[1], "Feminino": P[0]},
+            labels={"Sexo_full":"Sexo"},
+            opacity=0.7,
         )
         fig_sc.add_hline(y=25, line_dash="dot", line_color="#888",
                          annotation_text="Sobrepeso", annotation_font_size=10,
@@ -551,268 +365,625 @@ with tab4:
         fig_sc.add_hline(y=30, line_dash="dot", line_color="#c88",
                          annotation_text="Obesidade", annotation_font_size=10,
                          annotation_font_color="#000")
-        apply_layout(fig_sc, "IMC × Idade por Sexo", 280, grid_y=True)
-        st.plotly_chart(fig_sc, width="stretch", key="pc_26")
+        _lay(fig_sc, "IMC × Idade", 280, grid_y=True)
+        st.plotly_chart(fig_sc, key="d_scatter", use_container_width=True)
 
-    c5, c6 = st.columns(2)
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 2 — ESTILO DE VIDA
+# ══════════════════════════════════════════════════════════════════════════════
+with tab2:
+    st.markdown('<div class="sec-title">Estilo de Vida</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Hábitos e comportamentos dos pacientes</div>', unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.plotly_chart(donut(pct("Tabagismo"), "Tabagismo", [P[2], P[3], P[0]]),
+                        key="ev_tab", use_container_width=True)
+    with c2:
+        st.plotly_chart(donut(pct("Etilismo"), "Etilismo", [P[2], P[5], P[0]]),
+                        key="ev_etil", use_container_width=True)
+    with c3:
+        st.plotly_chart(donut(pct("Suplementação"), "Suplementação",
+                              [P[2], P[1]]), key="ev_supl", use_container_width=True)
+
+    c4, c5 = st.columns(2)
+    with c4:
+        atv_order = ["Moderada (3-5x/semana)", "Leve (1-2x/semana)", "Sedentário"]
+        atv_pct = pct("Atividade Física").reindex(
+            [a for a in atv_order if a in pct("Atividade Física").index]
+        )
+        st.plotly_chart(donut(atv_pct, "Atividade Física",
+                              [P[2], P[5], P[0]]), key="ev_atv", use_container_width=True)
     with c5:
-        st.plotly_chart(donut("vaccination_up_to_date", "Vacinação em Dia",
-                              [P[2], P[0]]),
-                        width="stretch", key="pc_27")
-    with c6:
-        st.plotly_chart(donut("birth_term", "Nascimento por Termo",
-                              [P[1], P[3], P[8]]),
-                        width="stretch", key="pc_28")
+        st.plotly_chart(donut(pct("Qualidade da Dieta"), "Qualidade da Dieta",
+                              [P[2], P[5], P[0]]), key="ev_diet", use_container_width=True)
 
-# ══════════════════════════════════════════════════════════
-# TAB 5 ─ ANÁLISES CRUZADAS
-# ══════════════════════════════════════════════════════════
+    sono_order = ["Bom (7-9h/noite)", "Regular (6-7h/noite)", "Ruim (<6h/noite)"]
+    sono_pct = pct("Qualidade do Sono").reindex(
+        [s for s in sono_order if s in pct("Qualidade do Sono").index]
+    )
+    st.plotly_chart(donut(sono_pct, "Qualidade do Sono",
+                          [P[2], P[5], P[0]], h=260), key="ev_sono", use_container_width=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 3 — HISTÓRICO MÉDICO
+# ══════════════════════════════════════════════════════════════════════════════
+with tab3:
+    st.markdown('<div class="sec-title">Histórico Médico</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Doenças crónicas, antecedentes e internações</div>', unsafe_allow_html=True)
+
+    # Doenças crônicas expandidas
+    doencas = split_expand("Doenças Crônicas").value_counts(normalize=True).mul(100).round(1)
+    doencas = doencas[doencas.index != "Nenhuma doença crônica"].sort_values()
+    fig_dc = go.Figure(go.Bar(
+        x=doencas.values, y=doencas.index, orientation="h",
+        marker_color=P[0],
+        text=[f"<b>{v:.0f}%</b>" for v in doencas.values],
+        textposition="outside", textfont=dict(size=12, color="#000"),
+    ))
+    _lay(fig_dc, "Prevalência de Doenças Crónicas (% dos pacientes)", max(220, len(doencas)*54))
+    fig_dc.update_xaxes(showticklabels=False, range=[0, doencas.max() * 1.3])
+    st.plotly_chart(fig_dc, key="hm_dc", use_container_width=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        hf = split_expand("Histórico Familiar").value_counts(normalize=True).mul(100).round(1).sort_values()
+        st.plotly_chart(hbar(hf, "Histórico Familiar", P[4]), key="hm_hf", use_container_width=True)
+    with c2:
+        st.plotly_chart(donut(pct("internado"), "Histórico de Internação",
+                              [P[3], P[2]]), key="hm_int", use_container_width=True)
+
+    # Número de doenças por paciente
+    c3, c4 = st.columns(2)
+    with c3:
+        n_doencas = df["Doenças Crônicas"].apply(
+            lambda x: 0 if x == "Nenhuma doença crônica" else len(str(x).split("; "))
+        )
+        nd_pct = n_doencas.value_counts(normalize=True).sort_index().mul(100).round(1)
+        nd_pct.index = nd_pct.index.astype(str)
+        fig_nd = go.Figure(go.Bar(
+            x=nd_pct.index, y=nd_pct.values,
+            marker_color=P[:len(nd_pct)],
+            text=[f"<b>{v:.0f}%</b>" for v in nd_pct.values],
+            textposition="outside", textfont=dict(size=12, color="#000"),
+        ))
+        _lay(fig_nd, "Número de Doenças Crónicas por Paciente", 280)
+        fig_nd.update_xaxes(title="Nº de doenças")
+        fig_nd.update_yaxes(showticklabels=False, range=[0, nd_pct.max()*1.25])
+        st.plotly_chart(fig_nd, key="hm_nd", use_container_width=True)
+    with c4:
+        st.plotly_chart(donut(pct("risco_grp"), "Risco de Internação em 10 Anos",
+                              [P[2], P[5], P[3], P[0]]), key="hm_risco", use_container_width=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 4 — COMPROMETIMENTOS
+# ══════════════════════════════════════════════════════════════════════════════
+with tab4:
+    st.markdown('<div class="sec-title">Comprometimentos por Sistema Orgânico</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Scores de 0 a 100 por sistema (média dos pacientes)</div>', unsafe_allow_html=True)
+
+    # Radar chart — médias gerais
+    means = df[COMP_COLS].mean().round(1)
+
+    fig_radar = go.Figure(go.Scatterpolar(
+        r=list(means.values) + [means.values[0]],
+        theta=COMP_LABELS + [COMP_LABELS[0]],
+        fill="toself",
+        fillcolor=f"rgba(143,200,232,0.25)",
+        line=dict(color=P[1], width=2),
+        marker=dict(size=6, color=P[1]),
+        name="Média geral",
+    ))
+    fig_radar.update_layout(
+        **_LAYOUT, height=420,
+        title=dict(text="Perfil Médio de Comprometimento por Sistema", font=dict(size=13, color=TDARK), x=0),
+        polar=dict(
+            bgcolor="rgba(0,0,0,0)",
+            radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(size=9, color=TDARK),
+                            gridcolor=BORDER),
+            angularaxis=dict(tickfont=dict(size=11, color=TDARK), gridcolor=BORDER),
+        ),
+    )
+    st.plotly_chart(fig_radar, key="comp_radar", use_container_width=True)
+
+    # Bar — ranking dos comprometimentos
+    means_sorted = means.sort_values()
+    means_sorted.index = [l.replace("Comprometimento ", "") for l in means_sorted.index]
+    fig_comp_bar = go.Figure(go.Bar(
+        x=means_sorted.values, y=means_sorted.index, orientation="h",
+        marker_color=P[1],
+        text=[f"<b>{v:.1f}</b>" for v in means_sorted.values],
+        textposition="outside", textfont=dict(size=12, color="#000"),
+    ))
+    _lay(fig_comp_bar, "Comprometimento Médio por Sistema (score 0–100)", max(300, len(means_sorted)*52))
+    fig_comp_bar.update_xaxes(showticklabels=False, range=[0, means_sorted.max()*1.2])
+    st.plotly_chart(fig_comp_bar, key="comp_bar", use_container_width=True)
+
+    # Box plots dos comprometimentos
+    fig_box = go.Figure()
+    for i, (col, label) in enumerate(zip(COMP_COLS, COMP_LABELS)):
+        fig_box.add_trace(go.Box(
+            y=df[col], name=label,
+            marker_color=P[i % len(P)],
+            line=dict(color=P[i % len(P)]),
+            boxmean=True,
+            hovertemplate=f"{label}<br>Score: %{{y}}<extra></extra>",
+        ))
+    _lay(fig_box, "Distribuição dos Scores de Comprometimento", 400, grid_y=True)
+    fig_box.update_xaxes(tickangle=-30)
+    fig_box.update_yaxes(title="Score (0–100)", range=[-5, 110])
+    st.plotly_chart(fig_box, key="comp_box", use_container_width=True)
+
+    # Radar por sexo
+    means_m = df[df["Sexo"]=="M"][COMP_COLS].mean().round(1)
+    means_f = df[df["Sexo"]=="F"][COMP_COLS].mean().round(1)
+    fig_r2 = go.Figure()
+    for vals, name, color in [(means_m, "Masculino", P[1]), (means_f, "Feminino", P[0])]:
+        fig_r2.add_trace(go.Scatterpolar(
+            r=list(vals.values) + [vals.values[0]],
+            theta=COMP_LABELS + [COMP_LABELS[0]],
+            fill="toself",
+            fillcolor=f"rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:],16)},0.18)",
+            line=dict(color=color, width=2),
+            name=name,
+        ))
+    fig_r2.update_layout(
+        **_LAYOUT, height=400,
+        title=dict(text="Comprometimento por Sistema × Sexo", font=dict(size=13, color=TDARK), x=0),
+        polar=dict(
+            bgcolor="rgba(0,0,0,0)",
+            radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(size=9, color=TDARK),
+                            gridcolor=BORDER),
+            angularaxis=dict(tickfont=dict(size=11, color=TDARK), gridcolor=BORDER),
+        ),
+    )
+    st.plotly_chart(fig_r2, key="comp_radar2", use_container_width=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 5 — ANÁLISES CRUZADAS
+# ══════════════════════════════════════════════════════════════════════════════
 with tab5:
     st.markdown('<div class="sec-title">Análises Cruzadas</div>', unsafe_allow_html=True)
     st.markdown('<div class="sec-sub">Relações entre variáveis clínicas e comportamentais</div>', unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
+
+    # IMC × Sexo
     with c1:
-        d = df[df["bmi_cat"].notna() & df["sex_at_birth"].notna()]
-        if not d.empty:
-            st.plotly_chart(stacked_bar(d, "sex_at_birth", "bmi_cat", "bmi_cat",
-                                        "IMC por Sexo",
-                                        order=["Masculino","Feminino"]), width="stretch", key="pc_29")
+        d = df[["Sexo_full","bmi_cat"]].dropna()
+        bmi_order = ["Abaixo do peso","Peso normal","Sobrepeso","Obesidade I","Obesidade II/III"]
+        st.plotly_chart(stacked(d, "Sexo_full", "bmi_cat", "IMC por Sexo",
+                                order=["Masculino","Feminino"]),
+                        key="cr_bmi_sex", use_container_width=True)
+
+    # Atividade Física × Qualidade do Sono
     with c2:
-        d = df[df["physical_activity_modal"].notna() & df["sleep_quality"].notna()]
-        if not d.empty:
-            st.plotly_chart(stacked_bar(d, "physical_activity_modal", "sleep_quality", "sleep_quality",
-                                        "Qualidade do Sono × Atividade Física", h=340),
-                            width="stretch", key="pc_30")
+        d = df[["Atividade Física","Qualidade do Sono"]].dropna()
+        st.plotly_chart(stacked(d, "Atividade Física", "Qualidade do Sono",
+                                "Qualidade do Sono × Atividade Física", h=320),
+                        key="cr_atv_sono", use_container_width=True)
 
     c3, c4 = st.columns(2)
+
+    # Tabagismo × Risco de Internação
     with c3:
-        d = df[df["risk_assessment"].notna() & df["age_group"].notna()]
-        if not d.empty:
-            age_order = ["< 30","30–39","40–49","50–59","60+"]
-            st.plotly_chart(stacked_bar(d, "age_group", "risk_assessment", "risk_assessment",
-                                        "Risco Cardiovascular × Faixa Etária",
-                                        order=age_order), width="stretch", key="pc_31")
+        d = df[["Tabagismo","risco_grp"]].dropna()
+        st.plotly_chart(stacked(d, "Tabagismo", "risco_grp",
+                                "Risco de Internação × Tabagismo", h=300),
+                        key="cr_tab_risco", use_container_width=True)
+
+    # Faixa etária × Doenças
     with c4:
-        d = df[df["diagnosis"].notna() & df["smoking_status"].notna()]
-        if not d.empty:
-            # Simplify diagnosis
-            d = d.copy()
-            d["has_chronic"] = d["diagnosis"].apply(
-                lambda x: "Com doença crónica" if x != "Nenhum" else "Sem diagnóstico"
-            )
-            st.plotly_chart(stacked_bar(d, "smoking_status", "has_chronic", "has_chronic",
-                                        "Doença Crónica × Tabagismo", h=300),
-                            width="stretch", key="pc_32")
+        d = df[["age_group"]].copy()
+        d["n_doencas"] = df["Doenças Crônicas"].apply(
+            lambda x: "Nenhuma" if x=="Nenhuma doença crônica"
+                      else ("1 doença" if len(str(x).split("; "))==1 else "2+ doenças")
+        )
+        age_order = ["< 30","30–39","40–49","50–59","60–69","70+"]
+        st.plotly_chart(stacked(d, "age_group", "n_doencas",
+                                "Número de Doenças × Faixa Etária",
+                                order=age_order, h=300),
+                        key="cr_age_doencas", use_container_width=True)
 
-    # Stress × Wellbeing
     c5, c6 = st.columns(2)
+
+    # Dieta × IMC
     with c5:
-        d = df[df["work_stress_level"].notna() & df["general_wellbeing"].notna()]
-        if not d.empty:
-            stress_order = ["baixo","médio","alto","estresse crônico"]
-            st.plotly_chart(stacked_bar(d, "work_stress_level", "general_wellbeing", "general_wellbeing",
-                                        "Bem-Estar × Stress no Trabalho",
-                                        order=stress_order), width="stretch", key="pc_33")
+        d = df[["Qualidade da Dieta","bmi_cat"]].dropna()
+        bmi_order2 = ["Peso normal","Sobrepeso","Obesidade I","Obesidade II/III"]
+        st.plotly_chart(stacked(d, "Qualidade da Dieta", "bmi_cat",
+                                "IMC × Qualidade da Dieta", h=300),
+                        key="cr_diet_bmi", use_container_width=True)
+
+    # Comprometimento cardiovascular × risco
     with c6:
-        # Family history → diagnosis
-        d = df[df["family_history"].notna() & df["diagnosis"].notna()].copy()
-        d["fam_card"] = d["family_history"].str.contains("Cardiovascular").map(
-            {True:"Hist. Cardiovascular", False:"Sem hist. cardiovascular"}
+        fig_cv = px.scatter(
+            df, x="Risco de Internação 10 anos (%)",
+            y="Comprometimento Cardiovascular",
+            color="Sexo_full",
+            color_discrete_map={"Masculino": P[1], "Feminino": P[0]},
+            opacity=0.65,
+            labels={"Sexo_full":"Sexo",
+                    "Risco de Internação 10 anos (%)":"Risco de Internação 10a (%)",
+                    "Comprometimento Cardiovascular":"Compr. Cardiovascular"},
         )
-        d["has_htn"] = d["diagnosis"].str.contains("Hipertensão|Doença Coronariana", na=False).map(
-            {True:"Diagnóstico cardíaco", False:"Sem diagnóstico cardíaco"}
-        )
-        ct = d.groupby(["fam_card","has_htn"]).size().unstack(fill_value=0)
-        ct_pct = ct.div(ct.sum(axis=1), axis=0).mul(100).round(1)
-        fig_fhd = go.Figure()
-        for i, col in enumerate(ct_pct.columns):
-            vals = ct_pct[col]
-            fig_fhd.add_trace(go.Bar(
-                name=col, x=ct_pct.index, y=vals,
-                marker_color=P[i],
-                text=[f"<b>{v:.0f}%</b>" if v >= 8 else "" for v in vals],
-                textposition="inside",
-                textfont=dict(size=11, color="#000000"),
-            ))
-        apply_layout(fig_fhd, "Risco Cardíaco × Histórico Familiar", 300)
-        fig_fhd.update_layout(barmode="stack",
-                              yaxis=dict(showticklabels=False, range=[0,110], showgrid=False))
-        st.plotly_chart(fig_fhd, width="stretch", key="pc_34")
+        _lay(fig_cv, "Comprometimento Cardiovascular × Risco de Internação", 300, grid_y=True)
+        st.plotly_chart(fig_cv, key="cr_cv_risco", use_container_width=True)
 
-# ══════════════════════════════════════════════════════════
-# TAB 6 ─ TENDÊNCIAS
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 6 — INDICADORES CLÍNICOS
+# ══════════════════════════════════════════════════════════════════════════════
 with tab6:
-    st.markdown('<div class="sec-title">Tendências Clínicas</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Evolução dos indicadores de saúde ao longo dos meses de acompanhamento</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-title">Indicadores Clínicos</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">DALY, expectativa de vida ajustada e risco de internação</div>', unsafe_allow_html=True)
 
-    # ── 1. Risco cardiovascular ao longo dos acompanhamentos ──────────────────
-    risk_order = ["Baixo","Moderado","Alto","Muito Alto"]
-    risk_colors = [P[2], P[5], P[3], P[0]]
+    c1, c2, c3 = st.columns(3)
 
-    # Combine registration + follow-ups
-    df_risk_base = df[df["risk_assessment"].notna()][["mes","risk_assessment"]].copy()
-    df_risk_base["mes"] = df["created_at"].dt.to_period("M").astype(str)
-
-    fup_risk = fup[fup["risk_assessment"].notna()][["mes","risk_assessment"]].copy()
-    all_risk  = pd.concat([df_risk_base, fup_risk], ignore_index=True)
-    all_risk  = all_risk[all_risk["mes"].notna() & (all_risk["mes"] != "NaT")]
-
-    pivot_risk = (all_risk.groupby(["mes","risk_assessment"]).size()
-                  .unstack(fill_value=0)
-                  .reindex(columns=[r for r in risk_order if r in all_risk["risk_assessment"].unique()])
-                  )
-    pivot_pct = pivot_risk.div(pivot_risk.sum(axis=1), axis=0).mul(100).round(1)
-    pivot_pct = pivot_pct.sort_index()
-
-    fig_risk = go.Figure()
-    for i, cat in enumerate(pivot_pct.columns):
-        fig_risk.add_trace(go.Bar(
-            name=cat, x=pivot_pct.index, y=pivot_pct[cat],
-            marker_color=risk_colors[risk_order.index(cat)],
-            text=[f"<b>{v:.0f}%</b>" if v >= 8 else "" for v in pivot_pct[cat]],
-            textposition="inside",
-            textfont=dict(size=11, color="#000000"),
-        ))
-    apply_layout(fig_risk, "Evolução do Risco Cardiovascular por Mês", 320)
-    fig_risk.update_layout(barmode="stack",
-                           yaxis=dict(showticklabels=False, range=[0,110], showgrid=False),
-                           xaxis_title="Mês")
-    st.plotly_chart(fig_risk, width="stretch", key="pc_35")
-
-    # ── 2. IMC médio ao longo dos acompanhamentos ─────────────────────────────
-    c1, c2 = st.columns(2)
+    # DALY distribution
     with c1:
-        bmi_base = df[df["bmi"].notna()][["mes","bmi"]].copy()
-        bmi_base["mes"] = df.loc[df["bmi"].notna(), "created_at"].dt.to_period("M").astype(str)
-        bmi_fup  = fup[fup["bmi"].notna()][["mes","bmi"]].copy()
-        all_bmi  = pd.concat([bmi_base, bmi_fup]).sort_values("mes")
-        all_bmi  = all_bmi[all_bmi["mes"].notna() & (all_bmi["mes"] != "NaT")]
-        bmi_avg  = all_bmi.groupby("mes")["bmi"].mean().round(2)
-
-        fig_bmi_trend = go.Figure()
-        fig_bmi_trend.add_trace(go.Scatter(
-            x=bmi_avg.index, y=bmi_avg.values,
-            mode="lines+markers+text",
-            line=dict(color=P[1], width=2.5),
-            marker=dict(size=9, color=P[1], line=dict(color="white", width=2)),
-            text=[f"<b>{v:.1f}</b>" for v in bmi_avg.values],
-            textposition="top center", textfont=dict(size=11, color="#000000"),
-            fill="tozeroy", fillcolor=f"rgba(143,200,232,0.15)",
-            name="IMC médio",
+        fig_daly = go.Figure(go.Histogram(
+            x=df["DALY Estimado"], nbinsx=12,
+            marker_color=P[4], marker_line_color="white", marker_line_width=1.5,
         ))
-        fig_bmi_trend.add_hline(y=25, line_dash="dot", line_color="#888",
-                                annotation_text="Limite sobrepeso",
-                                annotation_font_color="#000", annotation_font_size=10)
-        apply_layout(fig_bmi_trend, "Evolução do IMC Médio", 300, grid_y=True)
-        fig_bmi_trend.update_yaxes(range=[22, bmi_avg.max()*1.1])
-        st.plotly_chart(fig_bmi_trend, width="stretch", key="pc_36")
+        _lay(fig_daly, f"DALY Estimado (média {df['DALY Estimado'].mean():.1f})", 280)
+        fig_daly.update_xaxes(title="DALY (anos)")
+        fig_daly.update_yaxes(showticklabels=False)
+        st.plotly_chart(fig_daly, key="ic_daly", use_container_width=True)
 
-    # ── 3. Pressão arterial sistólica média ──────────────────────────────────
+    # Expectativa de Vida
     with c2:
-        bp_fup = fup[fup["systolic_bp"].notna()][["mes","systolic_bp","diastolic_bp"]].copy()
-        # base BPs
-        def parse_bp(s, idx=0):
-            try: return int(str(s).split("/")[idx])
-            except: return None
-        df_bp = df[df["blood_pressure"].notna()].copy()
-        df_bp["systolic_bp"]  = df_bp["blood_pressure"].apply(lambda x: parse_bp(x, 0))
-        df_bp["diastolic_bp"] = df_bp["blood_pressure"].apply(lambda x: parse_bp(x, 1))
-        df_bp["mes"]          = df_bp["created_at"].dt.to_period("M").astype(str)
-        base_bp = df_bp[["mes","systolic_bp","diastolic_bp"]]
-
-        all_bp  = pd.concat([base_bp, bp_fup]).sort_values("mes")
-        all_bp  = all_bp[all_bp["mes"].notna() & (all_bp["mes"] != "NaT")]
-        bp_avg  = all_bp.groupby("mes")[["systolic_bp","diastolic_bp"]].mean().round(1)
-
-        fig_bp = go.Figure()
-        fig_bp.add_trace(go.Scatter(
-            x=bp_avg.index, y=bp_avg["systolic_bp"],
-            mode="lines+markers+text",
-            name="Sistólica",
-            line=dict(color=P[0], width=2.5),
-            marker=dict(size=8, color=P[0]),
-            text=[f"<b>{v:.0f}</b>" for v in bp_avg["systolic_bp"]],
-            textposition="top center", textfont=dict(size=10, color="#000000"),
+        fig_ev = go.Figure(go.Histogram(
+            x=df["Expectativa de Vida Ajustada"], nbinsx=12,
+            marker_color=P[2], marker_line_color="white", marker_line_width=1.5,
         ))
-        fig_bp.add_trace(go.Scatter(
-            x=bp_avg.index, y=bp_avg["diastolic_bp"],
-            mode="lines+markers+text",
-            name="Diastólica",
-            line=dict(color=P[1], width=2.5),
-            marker=dict(size=8, color=P[1]),
-            text=[f"<b>{v:.0f}</b>" for v in bp_avg["diastolic_bp"]],
-            textposition="bottom center", textfont=dict(size=10, color="#000000"),
+        _lay(fig_ev, f"Expectativa de Vida Ajustada (média {df['Expectativa de Vida Ajustada'].mean():.1f}a)", 280)
+        fig_ev.update_xaxes(title="Anos")
+        fig_ev.update_yaxes(showticklabels=False)
+        st.plotly_chart(fig_ev, key="ic_ev", use_container_width=True)
+
+    # Risco de Internação
+    with c3:
+        fig_ri = go.Figure(go.Histogram(
+            x=df["Risco de Internação 10 anos (%)"], nbinsx=12,
+            marker_color=P[3], marker_line_color="white", marker_line_width=1.5,
         ))
-        fig_bp.add_hline(y=140, line_dash="dot", line_color="#e88",
-                         annotation_text="Hipertensão estágio 1",
-                         annotation_font_color="#000", annotation_font_size=10)
-        apply_layout(fig_bp, "Evolução da Pressão Arterial Média (mmHg)", 300, grid_y=True)
-        st.plotly_chart(fig_bp, width="stretch", key="pc_37")
+        _lay(fig_ri, f"Risco de Internação 10 anos (média {df['Risco de Internação 10 anos (%)'].mean():.0f}%)", 280)
+        fig_ri.update_xaxes(title="%")
+        fig_ri.update_yaxes(showticklabels=False)
+        st.plotly_chart(fig_ri, key="ic_ri", use_container_width=True)
 
-    # ── 4. Prevalência de doenças crónicas por mês ──────────────────────────
-    chronic_conditions = ["Hipertensão Arterial","Diabetes Tipo 2","Dislipidemia",
-                          "Obesidade","Doença Coronariana"]
-    df_chr = df[df["diagnosis"].notna() & df["mes"].notna()].copy()
-    df_chr = df_chr[df_chr["mes"] != "NaT"]
+    # DALY × Idade scatter (por sexo)
+    fig_dy_age = px.scatter(
+        df, x="Idade", y="DALY Estimado",
+        color="Sexo_full",
+        color_discrete_map={"Masculino": P[1], "Feminino": P[0]},
+        size="Risco de Internação 10 anos (%)",
+        size_max=18,
+        opacity=0.7,
+        labels={"Sexo_full":"Sexo","DALY Estimado":"DALY"},
+        hover_data={"Doenças Crônicas": True, "IMC": True},
+    )
+    _lay(fig_dy_age, "DALY × Idade — tamanho = Risco de Internação", 360, grid_y=True)
+    st.plotly_chart(fig_dy_age, key="ic_daly_age", use_container_width=True)
 
-    all_months = sorted(df_chr["mes"].unique())
-    chronic_rows = []
-    for month in all_months:
-        patients_to_date = df_chr[df_chr["mes"] <= month]
-        total_pt = len(patients_to_date)
-        for cond in chronic_conditions:
-            n_with = patients_to_date["diagnosis"].str.contains(cond, na=False).sum()
-            pct_val = round(n_with / total_pt * 100, 1) if total_pt > 0 else 0
-            chronic_rows.append({"mes": month, "condition": cond, "pct": pct_val, "n": total_pt})
+    # DALY × sexo + atividade física
+    c4, c5 = st.columns(2)
+    with c4:
+        fig_daly_sex = go.Figure()
+        for i, sexo in enumerate(["Masculino","Feminino"]):
+            vals = df[df["Sexo_full"]==sexo]["DALY Estimado"]
+            fig_daly_sex.add_trace(go.Box(
+                y=vals, name=sexo,
+                marker_color=P[i], line=dict(color=P[i]),
+                boxmean=True,
+            ))
+        _lay(fig_daly_sex, "DALY por Sexo", 300, grid_y=True)
+        fig_daly_sex.update_yaxes(title="DALY")
+        st.plotly_chart(fig_daly_sex, key="ic_daly_sex", use_container_width=True)
 
-    df_chr_trend = pd.DataFrame(chronic_rows)
+    with c5:
+        fig_daly_atv = go.Figure()
+        atv_order2 = ["Moderada (3-5x/semana)","Leve (1-2x/semana)","Sedentário"]
+        for i, atv in enumerate(atv_order2):
+            vals = df[df["Atividade Física"]==atv]["DALY Estimado"]
+            fig_daly_atv.add_trace(go.Box(
+                y=vals, name=atv.split(" (")[0],
+                marker_color=P[i], line=dict(color=P[i]),
+                boxmean=True,
+            ))
+        _lay(fig_daly_atv, "DALY × Atividade Física", 300, grid_y=True)
+        fig_daly_atv.update_yaxes(title="DALY")
+        st.plotly_chart(fig_daly_atv, key="ic_daly_atv", use_container_width=True)
 
-    fig_chr = go.Figure()
-    for i, cond in enumerate(chronic_conditions):
-        sub = df_chr_trend[df_chr_trend["condition"] == cond]
-        if sub.empty: continue
-        fig_chr.add_trace(go.Scatter(
-            x=sub["mes"], y=sub["pct"],
-            mode="lines+markers",
-            name=cond,
-            line=dict(color=P[i % len(P)], width=2.2),
-            marker=dict(size=8, color=P[i % len(P)]),
-            hovertemplate=f"{cond}: %{{y:.1f}}% (n=%{{customdata}})<extra></extra>",
-            customdata=sub["n"],
+    # Expectativa de vida × nº de doenças
+    df_ev = df.copy()
+    df_ev["n_doencas_grp"] = df_ev["Doenças Crônicas"].apply(
+        lambda x: "0" if x=="Nenhuma doença crônica"
+                  else ("1" if len(str(x).split("; "))==1
+                  else ("2" if len(str(x).split("; "))==2 else "3+"))
+    )
+    fig_ev_nd = go.Figure()
+    for i, nd in enumerate(["0","1","2","3+"]):
+        vals = df_ev[df_ev["n_doencas_grp"]==nd]["Expectativa de Vida Ajustada"]
+        if vals.empty: continue
+        fig_ev_nd.add_trace(go.Box(
+            y=vals, name=f"{nd} {'doença' if nd=='1' else 'doenças'}",
+            marker_color=P[i], line=dict(color=P[i]),
+            boxmean=True,
         ))
-    apply_layout(fig_chr, "Prevalência Cumulativa de Doenças Crónicas (%)", 340, grid_y=True)
-    fig_chr.update_yaxes(title="% dos pacientes", range=[0, df_chr_trend["pct"].max()*1.25])
-    fig_chr.update_xaxes(title="Mês")
-    st.plotly_chart(fig_chr, width="stretch", key="pc_38")
+    _lay(fig_ev_nd, "Expectativa de Vida Ajustada × Nº de Doenças Crónicas", 320, grid_y=True)
+    fig_ev_nd.update_yaxes(title="Anos")
+    st.plotly_chart(fig_ev_nd, key="ic_ev_nd", use_container_width=True)
 
-    # ── 5. Cadastros por mês ─────────────────────────────────────────────────
-    monthly = df[df["mes"].notna() & (df["mes"] != "NaT")].groupby("mes").size().reset_index(name="n")
-    monthly = monthly.sort_values("mes")
-    monthly["acumulado"] = monthly["n"].cumsum()
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 7 — EXPLORADOR INTERATIVO
+# ══════════════════════════════════════════════════════════════════════════════
+with tab7:
+    st.markdown('<div class="sec-title">Explorador de Variáveis</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Escolha as variáveis e o tipo de visualização para explorar relações</div>', unsafe_allow_html=True)
 
-    fig_cad = make_subplots(specs=[[{"secondary_y": True}]])
-    fig_cad.add_trace(go.Bar(
-        x=monthly["mes"], y=monthly["n"],
-        name="Novos cadastros", marker_color=P[1],
-        text=[f"<b>{v}</b>" for v in monthly["n"]],
-        textposition="outside",
-        textfont=dict(size=12, color="#000000"),
-    ), secondary_y=False)
-    fig_cad.add_trace(go.Scatter(
-        x=monthly["mes"], y=monthly["acumulado"],
-        name="Total acumulado", mode="lines+markers",
-        line=dict(color=P[0], width=2.5),
-        marker=dict(size=8, color=P[0]),
-    ), secondary_y=True)
-    fig_cad.update_layout(**LAYOUT, height=300,
-                          title=dict(text="Crescimento de Cadastros por Mês",
-                                     font=dict(size=13, color=TDARK), x=0))
-    fig_cad.update_xaxes(**AXIS, title="Mês")
-    fig_cad.update_yaxes(title="Novos", showgrid=False, color=TDARK,
-                          secondary_y=False)
-    fig_cad.update_yaxes(title="Acumulado", showgrid=False, color=P[0],
-                          secondary_y=True)
-    fig_cad.update_layout(legend=dict(orientation="h", y=-0.25, font=dict(size=11, color=TDARK)))
-    st.plotly_chart(fig_cad, width="stretch", key="pc_39")
+    # ── Definição das variáveis disponíveis ───────────────────────────────────
+    CATS = {
+        "Sexo":              "Sexo_full",
+        "Faixa Etária":      "age_group",
+        "IMC (categoria)":   "bmi_cat",
+        "Tabagismo":         "Tabagismo",
+        "Etilismo":          "Etilismo",
+        "Atividade Física":  "Atividade Física",
+        "Qualidade da Dieta":"Qualidade da Dieta",
+        "Qualidade do Sono": "Qualidade do Sono",
+        "Suplementação":     "Suplementação",
+        "Risco de Internação":"risco_grp",
+        "Histórico de Internação":"internado",
+    }
+    NUMS = {
+        "Idade":                          "Idade",
+        "IMC":                            "IMC",
+        "DALY Estimado":                  "DALY Estimado",
+        "Expectativa de Vida Ajustada":   "Expectativa de Vida Ajustada",
+        "Risco de Internação 10 anos (%)":"Risco de Internação 10 anos (%)",
+        "Compr. Cardiovascular":          "Comprometimento Cardiovascular",
+        "Compr. Endócrino":               "Comprometimento Endócrino",
+        "Compr. Respiratório":            "Comprometimento Respiratório",
+        "Compr. Digestivo":               "Comprometimento Digestivo",
+        "Compr. Urinário":                "Comprometimento Urinário",
+        "Compr. Osteoarticular":          "Comprometimento Osteoarticular",
+        "Compr. Muscular":                "Comprometimento Muscular",
+        "Compr. Neurológico":             "Comprometimento Neurológico",
+        "Compr. Psicológico":             "Comprometimento Psicológico",
+    }
+    ALL_VARS = {**CATS, **NUMS}
+    CAT_KEYS = list(CATS.keys())
+    NUM_KEYS = list(NUMS.keys())
+    ALL_KEYS = list(ALL_VARS.keys())
+
+    # ── Seletores ─────────────────────────────────────────────────────────────
+    st.markdown(f"""
+    <div style="background:{CARD};border:1px solid {BORDER};border-radius:14px;
+                padding:20px 24px;margin-bottom:20px;">
+    """, unsafe_allow_html=True)
+
+    col_tipo, col_x, col_y, col_cor = st.columns([1.2, 1.5, 1.5, 1.5])
+
+    with col_tipo:
+        tipo = st.selectbox(
+            "Tipo de gráfico",
+            ["Barras empilhadas", "Barras agrupadas", "Dispersão (scatter)",
+             "Boxplot", "Histograma", "Violino"],
+            key="exp_tipo",
+        )
+
+    # Defaults inteligentes por tipo
+    if tipo in ["Barras empilhadas", "Barras agrupadas"]:
+        default_x  = CAT_KEYS.index("Atividade Física")
+        default_y  = CAT_KEYS.index("Qualidade do Sono")
+        default_cor = 0
+        x_options  = CAT_KEYS
+        y_options  = CAT_KEYS
+        cor_options = ["(nenhuma)"] + CAT_KEYS
+    elif tipo == "Dispersão (scatter)":
+        default_x  = NUM_KEYS.index("Idade")
+        default_y  = NUM_KEYS.index("DALY Estimado")
+        default_cor = 0
+        x_options  = NUM_KEYS
+        y_options  = NUM_KEYS
+        cor_options = ["(nenhuma)"] + CAT_KEYS
+    elif tipo == "Boxplot":
+        default_x  = CAT_KEYS.index("Atividade Física")
+        default_y  = NUM_KEYS.index("DALY Estimado")
+        default_cor = 0
+        x_options  = CAT_KEYS
+        y_options  = NUM_KEYS
+        cor_options = ["(nenhuma)"] + CAT_KEYS
+    elif tipo == "Violino":
+        default_x  = CAT_KEYS.index("Tabagismo")
+        default_y  = NUM_KEYS.index("Comprometimento Cardiovascular")
+        default_cor = 0
+        x_options  = CAT_KEYS
+        y_options  = NUM_KEYS
+        cor_options = ["(nenhuma)"] + CAT_KEYS
+    else:  # Histograma
+        default_x  = NUM_KEYS.index("Idade")
+        default_y  = 0
+        default_cor = 0
+        x_options  = NUM_KEYS
+        y_options  = NUM_KEYS          # ignorado
+        cor_options = ["(nenhuma)"] + CAT_KEYS
+
+    with col_x:
+        label_x = st.selectbox(
+            "Eixo X" if tipo != "Histograma" else "Variável",
+            x_options,
+            index=min(default_x, len(x_options)-1),
+            key="exp_x",
+        )
+    with col_y:
+        if tipo not in ["Histograma"]:
+            label_y = st.selectbox(
+                "Eixo Y" if tipo != "Barras empilhadas" else "Cor / Segmento",
+                y_options,
+                index=min(default_y, len(y_options)-1),
+                key="exp_y",
+            )
+        else:
+            label_y = None
+            st.selectbox("Eixo Y", ["(automático)"], key="exp_y_dummy", disabled=True)
+
+    with col_cor:
+        if tipo not in ["Barras empilhadas"]:
+            label_cor = st.selectbox(
+                "Colorir por",
+                cor_options,
+                index=0,
+                key="exp_cor",
+            )
+        else:
+            label_cor = "(nenhuma)"
+            st.selectbox("Colorir por", ["(automático)"], key="exp_cor_dummy", disabled=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── Resolução das colunas reais ───────────────────────────────────────────
+    col_x   = ALL_VARS.get(label_x, label_x)
+    col_y   = ALL_VARS.get(label_y, label_y) if label_y else None
+    col_cor = ALL_VARS.get(label_cor) if label_cor and label_cor != "(nenhuma)" else None
+
+    # Gerar paleta de cor dinâmica
+    def make_color_map(series):
+        cats = series.dropna().unique()
+        return {c: P[i % len(P)] for i, c in enumerate(sorted(cats))}
+
+    # ── Renderização ──────────────────────────────────────────────────────────
+    try:
+        if tipo in ["Barras empilhadas", "Barras agrupadas"]:
+            grp = [col_x, col_y]
+            ct = df[grp].dropna().groupby(grp).size().unstack(fill_value=0)
+            if tipo == "Barras empilhadas":
+                ct = ct.div(ct.sum(axis=1), axis=0).mul(100).round(1)
+            fig_exp = go.Figure()
+            for i, col in enumerate(ct.columns):
+                vals = ct[col]
+                fig_exp.add_trace(go.Bar(
+                    name=str(col),
+                    x=ct.index.astype(str),
+                    y=vals.values,
+                    marker_color=P[i % len(P)],
+                    text=[f"<b>{v:.0f}{'%' if tipo=='Barras empilhadas' else ''}</b>"
+                          if v >= (5 if tipo=="Barras empilhadas" else 1) else ""
+                          for v in vals],
+                    textposition="inside",
+                    textfont=dict(size=11, color="#000"),
+                ))
+            _lay(fig_exp,
+                 f"{label_x} × {label_y}" + (" (%)" if tipo=="Barras empilhadas" else ""),
+                 380)
+            fig_exp.update_layout(
+                barmode="stack" if tipo=="Barras empilhadas" else "group",
+                xaxis_tickangle=-20,
+                yaxis=dict(showgrid=False,
+                           showticklabels=tipo!="Barras empilhadas",
+                           range=[0, 110] if tipo=="Barras empilhadas" else None),
+            )
+
+        elif tipo == "Dispersão (scatter)":
+            plot_df = df[[col_x, col_y] + ([col_cor] if col_cor else [])].dropna()
+            if col_cor:
+                cmap = make_color_map(plot_df[col_cor])
+                fig_exp = px.scatter(
+                    plot_df, x=col_x, y=col_y, color=col_cor,
+                    color_discrete_map=cmap,
+                    opacity=0.7,
+                    labels={col_cor: label_cor},
+                    trendline="ols",
+                )
+            else:
+                fig_exp = px.scatter(
+                    plot_df, x=col_x, y=col_y,
+                    opacity=0.7,
+                    trendline="ols",
+                    color_discrete_sequence=[P[1]],
+                )
+            _lay(fig_exp, f"{label_x} × {label_y}", 420, grid_y=True)
+            fig_exp.update_traces(selector=dict(mode="lines"),
+                                  line=dict(dash="dot", width=1.5))
+
+        elif tipo == "Boxplot":
+            plot_df = df[[col_x, col_y] + ([col_cor] if col_cor else [])].dropna()
+            cats = sorted(plot_df[col_x].unique())
+            if col_cor:
+                fig_exp = px.box(
+                    plot_df, x=col_x, y=col_y, color=col_cor,
+                    color_discrete_sequence=P,
+                    labels={col_cor: label_cor},
+                )
+            else:
+                cmap = {c: P[i % len(P)] for i, c in enumerate(cats)}
+                fig_exp = go.Figure()
+                for i, cat in enumerate(cats):
+                    vals = plot_df[plot_df[col_x] == cat][col_y]
+                    fig_exp.add_trace(go.Box(
+                        y=vals, name=str(cat),
+                        marker_color=P[i % len(P)],
+                        line=dict(color=P[i % len(P)]),
+                        boxmean=True,
+                    ))
+            _lay(fig_exp, f"{label_y} por {label_x}", 420, grid_y=True)
+            fig_exp.update_xaxes(tickangle=-20)
+            fig_exp.update_yaxes(title=label_y)
+
+        elif tipo == "Violino":
+            plot_df = df[[col_x, col_y] + ([col_cor] if col_cor else [])].dropna()
+            cats = sorted(plot_df[col_x].unique())
+            fig_exp = go.Figure()
+            for i, cat in enumerate(cats):
+                vals = plot_df[plot_df[col_x] == cat][col_y]
+                fig_exp.add_trace(go.Violin(
+                    y=vals, name=str(cat),
+                    box_visible=True, meanline_visible=True,
+                    fillcolor=P[i % len(P)],
+                    line_color=P[i % len(P)],
+                    opacity=0.8,
+                ))
+            _lay(fig_exp, f"{label_y} por {label_x}", 420, grid_y=True)
+            fig_exp.update_xaxes(tickangle=-20)
+            fig_exp.update_yaxes(title=label_y)
+
+        else:  # Histograma
+            plot_df = df[[col_x] + ([col_cor] if col_cor else [])].dropna()
+            if col_cor:
+                fig_exp = px.histogram(
+                    plot_df, x=col_x, color=col_cor,
+                    color_discrete_sequence=P,
+                    barmode="overlay",
+                    opacity=0.75,
+                    histnorm="percent",
+                    labels={col_cor: label_cor},
+                )
+            else:
+                fig_exp = go.Figure(go.Histogram(
+                    x=plot_df[col_x], nbinsx=15,
+                    marker_color=P[1],
+                    marker_line_color="white", marker_line_width=1.5,
+                    histnorm="percent",
+                ))
+            _lay(fig_exp, f"Distribuição de {label_x}", 380, grid_y=False)
+            fig_exp.update_xaxes(title=label_x)
+            fig_exp.update_yaxes(showticklabels=False, title="")
+
+        st.plotly_chart(fig_exp, key="exp_chart", use_container_width=True)
+
+        # ── Tabela resumo ─────────────────────────────────────────────────────
+        with st.expander("Ver tabela de dados resumida"):
+            cols_show = [col_x] + ([col_y] if col_y else []) + ([col_cor] if col_cor else [])
+            cols_show = list(dict.fromkeys(cols_show))  # dedup mantendo ordem
+            resumo = df[cols_show].dropna()
+            if col_x in NUMS.values() and col_y and col_y in NUMS.values():
+                st.dataframe(
+                    resumo.describe().round(2),
+                    use_container_width=True,
+                )
+            else:
+                st.dataframe(resumo.head(50), use_container_width=True, hide_index=True)
+
+    except Exception as e:
+        st.warning(f"Não foi possível gerar o gráfico com esta combinação: {e}")
