@@ -760,10 +760,10 @@ with tab7:
         default_x, default_y, x_options, y_options = CAT_KEYS.index("Atividade Física"), CAT_KEYS.index("Qualidade do Sono"), CAT_KEYS, CAT_KEYS
         cor_options = ["(nenhuma)"] + CAT_KEYS
     elif tipo == "Dispersão (scatter)":
-        default_x, default_y, x_options, y_options = NUM_KEYS.index("Idade"), NUM_KEYS.index("DALY Estimado"), NUM_KEYS, NUM_KEYS
+        default_x, default_y, x_options, y_options = NUM_KEYS.index("Idade"), NUM_KEYS.index("Health Burden Index"), NUM_KEYS, NUM_KEYS
         cor_options = ["(nenhuma)"] + CAT_KEYS
     elif tipo in ["Boxplot","Violino"]:
-        default_x, default_y, x_options, y_options = CAT_KEYS.index("Atividade Física"), NUM_KEYS.index("DALY Estimado"), CAT_KEYS, NUM_KEYS
+        default_x, default_y, x_options, y_options = CAT_KEYS.index("Atividade Física"), NUM_KEYS.index("Health Burden Index"), CAT_KEYS, NUM_KEYS
         cor_options = ["(nenhuma)"] + CAT_KEYS
     else:
         default_x, default_y, x_options, y_options = NUM_KEYS.index("Idade"), 0, NUM_KEYS, NUM_KEYS
@@ -926,6 +926,31 @@ with tab8:
                         </div>""", unsafe_allow_html=True)
 
                 st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
+
+                # História do paciente
+                mensagem = paciente_raw.get("mensagem_original", "")
+                if mensagem:
+                    with st.expander("📋 História clínica do paciente", expanded=False):
+                        linhas = mensagem.strip().split("\n")
+                        for linha in linhas:
+                            if ":" in linha:
+                                label, _, valor = linha.partition(":")
+                                st.markdown(
+                                    f"<div style='display:flex;gap:12px;padding:5px 0;"
+                                    f"border-bottom:1px solid {BORDER};font-size:13px;'>"
+                                    f"<span style='color:{TMID};font-weight:500;min-width:200px;flex-shrink:0'>{label.strip()}</span>"
+                                    f"<span style='color:{TDARK}'>{valor.strip()}</span>"
+                                    f"</div>",
+                                    unsafe_allow_html=True
+                                )
+                            elif linha.strip():
+                                st.markdown(
+                                    f"<div style='padding:5px 0;font-size:13px;color:{TDARK}'>{linha.strip()}</div>",
+                                    unsafe_allow_html=True
+                                )
+
+                st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
+
 
                 # Radar presente
                 s_vals   = [row_pres.get(c) for c in SISTEMAS_COLS]
