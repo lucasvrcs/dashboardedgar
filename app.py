@@ -952,6 +952,41 @@ with tab8:
                 st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
 
 
+                # Recomendações do paciente
+                recomendacoes = paciente_raw.get("recomendacoes")
+                if recomendacoes:
+                    with st.expander("💊 Recomendações de saúde", expanded=False):
+                        gerais = recomendacoes.get("gerais", "")
+                        especificas = recomendacoes.get("especificas", "")
+                        if gerais:
+                            st.markdown(
+                                f"<div style='font-size:12px;font-weight:600;color:{TMID};"
+                                f"text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;'>"
+                                f"Recomendações Gerais</div>",
+                                unsafe_allow_html=True
+                            )
+                            st.markdown(
+                                f"<div style='font-size:13px;color:{TDARK};line-height:1.7;"
+                                f"padding:12px 14px;background:{CARD};border:1px solid {BORDER};"
+                                f"border-radius:10px;margin-bottom:12px;'>{gerais}</div>",
+                                unsafe_allow_html=True
+                            )
+                        if especificas:
+                            st.markdown(
+                                f"<div style='font-size:12px;font-weight:600;color:{TMID};"
+                                f"text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;'>"
+                                f"Recomendações Específicas</div>",
+                                unsafe_allow_html=True
+                            )
+                            st.markdown(
+                                f"<div style='font-size:13px;color:{TDARK};line-height:1.7;"
+                                f"padding:12px 14px;background:{CARD};border:1px solid {BORDER};"
+                                f"border-radius:10px;'>{especificas}</div>",
+                                unsafe_allow_html=True
+                            )
+
+                st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
+
                 # Radar presente
                 s_vals   = [row_pres.get(c) for c in SISTEMAS_COLS]
                 valid    = [(l, v) for l, v in zip(SISTEMAS_LABELS, s_vals) if v is not None and not pd.isna(v)]
